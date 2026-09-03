@@ -16,7 +16,7 @@ $settings = json_decode(file_get_contents("settings.json"), true);
 if(!isset($settings['proof_link'])) $settings['proof_link'] = "https://t.me/BMWytx";
 if(!isset($settings['howto_link'])) $settings['howto_link'] = "https://t.me/BMWytx/145";
 if(!isset($settings['support_user'])) $settings['support_user'] = "@BMWytx9";
-if(!isset($settings['api_key'])) $settings['api_key'] = "FAM_FCAA374ADAFD806DCD3AA33A29DBE6AFBB27A09A";
+if(!isset($settings['api_key'])) $settings['api_key'] = "fam_6ce10996ccd42211d2a9a8e9aa0a4caed8b8f5ee";
 file_put_contents("settings.json", json_encode($settings));
 
 // ========== DEFAULT CATEGORIES ==========
