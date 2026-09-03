@@ -13,9 +13,9 @@ foreach(["balances.json","orders.json","temp.json","users.json","settings.json",
 
 // ========== DEFAULT SETTINGS ==========
 $settings = json_decode(file_get_contents("settings.json"), true);
-if(!isset($settings['proof_link'])) $settings['proof_link'] = "https://t.me/YourProofChannel";
-if(!isset($settings['howto_link'])) $settings['howto_link'] = "https://t.me/YourHowToVideo";
-if(!isset($settings['support_user'])) $settings['support_user'] = "@YourSupportUsername";
+if(!isset($settings['proof_link'])) $settings['proof_link'] = "https://t.me/BMWytx";
+if(!isset($settings['howto_link'])) $settings['howto_link'] = "https://t.me/BMWytx/145";
+if(!isset($settings['support_user'])) $settings['support_user'] = "@BMWytx9";
 if(!isset($settings['api_key'])) $settings['api_key'] = "FAM_FCAA374ADAFD806DCD3AA33A29DBE6AFBB27A09A";
 file_put_contents("settings.json", json_encode($settings));
 
@@ -984,7 +984,7 @@ function sendSelectCatForProduct($chat_id, $message_id){
 
 // ========== USER FUNCTIONS ==========
 function sendMainMenu($chat_id, $name, $balance, $message_id = 0){
-    $msg = "👑 ———— <b>GALU MODZ SELLING BOT</b> ———— 👑\n\n🧡 Yo — ꨄ <b>$name</b>, Welcome Back!!\n\n🔥 ———— WHY CHOOSE US ———— 🔥\n\n🔑 Genuine Premium Keys\n⚡ Instant Auto Delivery\n🛡️ Secure UPI Payments\n💎 Unbeatable Prices\n👊 Real 24/7 Support\n——————————————————————\n💰 Let's get you a key!\n\n💲 <b>Your Balance: ₹$balance.00</b>";
+    $msg = "👑 ———— <b>BMWytx SELLING BOT</b> ———— 👑\n\n🧡 Yo — ꨄ <b>$name</b>, Welcome Back!!\n\n🔥 ———— WHY CHOOSE US ———— 🔥\n\n🔑 Genuine Premium Keys\n⚡ Instant Auto Delivery\n🛡️ Secure UPI Payments\n💎 Unbeatable Prices\n👊 Real 24/7 Support\n——————————————————————\n💰 Let's get you a key!\n\n💲 <b>Your Balance: ₹$balance.00</b>";
     $kb = [
         [["🛒 Shop Now","shop"]],
         [["📦 My Orders","orders"],["👤 Profile","profile"]],
