@@ -1063,259 +1063,331 @@ function handleKeypad($chat_id, $message_id, $user_id, $key){
     sendKeypad($chat_id, $message_id, $user_id, $amount); 
 }
 
-// ============================================================
-// =================== PAYMENT SYSTEM ==========================
-// ============================================================
+// ========== PAYMENT FUNCTIONS ==========
 
-/**
- * Make a secure cURL request to FamGateway API
- * Based on bot.py's FamGateway Python SDK
- */
-/**
- * Safe JSON loader
- */
-function loadJsonFile($file, $default = []) {
-    if (!file_exists($file)) {
-        return $default;
-    }
+function loadJsonSafe($file, $default = []){
+    if(!file_exists($file)) return $default;
 
-    $content = file_get_contents($file);
-
-    if ($content === false || trim($content) === '') {
-        return $default;
-    }
-
-    $data = json_decode($content, true);
-
+    $data = json_decode(file_get_contents($file), true);
     return is_array($data) ? $data : $default;
 }
 
-
-/**
- * Safe JSON writer
- */
-function saveJsonFile($file, $data) {
-    $json = json_encode(
-        $data,
-        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
-    );
-
-    if ($json === false) {
-        return false;
-    }
-
+function saveJsonSafe($file, $data){
     return file_put_contents(
         $file,
-        $json,
+        json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
         LOCK_EX
     ) !== false;
 }
 
+function getFamApiKey(){
+    $key = getenv("FAMGATEWAY_API_KEY");
 
-/**
- * Get FamGateway API key
- */
-function getFamGatewayApiKey() {
+    if(!empty($key)) return trim($key);
 
-    $api_key = getenv("FAMGATEWAY_API_KEY");
-
-    if (!empty($api_key)) {
-        return trim($api_key);
-    }
-
-    $settings = loadJsonFile("settings.json", []);
-
-    return trim($settings['api_key'] ?? '');
+    $settings = loadJsonSafe("settings.json", []);
+    return trim($settings["api_key"] ?? "");
 }
 
 
-/**
- * Check payment status
+/*
+ * CREATE PAYMENT ORDER
+ * ₹50 etc. click karte hi QR generate hoga
  */
-function checkPayment($chat_id, $message_id, $order_id, $user_id) {
+function createFamPayOrder($chat_id, $message_id, $user_id, $amount){
 
-    // API key
-    $api_key = getFamGatewayApiKey();
+    $amount = (float)$amount;
+    $api_key = getFamApiKey();
 
-    if (
-        empty($api_key) ||
-        $api_key === "FAM KEY DALO YAHA"
-    ) {
-
+    if(empty($api_key)){
         editMsg(
             $chat_id,
             $message_id,
-            "❌ Payment system not configured. Please contact admin.",
-            btn([["⬅️ Back", "backkey"]])
+            "❌ FamGateway API key set nahi hai.",
+            btn([
+                ["⬅️ Back","backkey"]
+            ])
         );
-
         return;
     }
 
-
-    // Load payments
-    $payments = loadJsonFile("payments.json", []);
-
-    if (!isset($payments[$order_id])) {
-
+    if($amount < 1 || $amount > 5000){
         editMsg(
             $chat_id,
             $message_id,
-            "❌ Payment order not found.",
-            btn([["⬅️ Back", "backkey"]])
+            "❌ Amount ₹1 se ₹5000 ke beech me hona chahiye.",
+            btn([
+                ["⬅️ Back","backkey"]
+            ])
         );
-
-        return;
-    }
-
-
-    $payment = $payments[$order_id];
-
-
-    // Verify correct user
-    if (
-        !isset($payment['user_id']) ||
-        (string)$payment['user_id'] !== (string)$user_id
-    ) {
-
-        editMsg(
-            $chat_id,
-            $message_id,
-            "❌ This payment order does not belong to you.",
-            btn([["⬅️ Back", "backkey"]])
-        );
-
         return;
     }
 
 
     /*
-     * Already credited
-     */
-    if (!empty($payment['credited'])) {
-
-        $balances = loadJsonFile("balances.json", []);
-
-        $balance = isset($balances[$user_id])
-            ? (float)$balances[$user_id]
-            : 0;
-
-        editMsg(
-            $chat_id,
-            $message_id,
-            "✅ <b>Payment Already Processed!</b>\n\n" .
-            "💼 Current Balance: ₹" .
-            number_format($balance, 2),
-            btn([["⬅️ Back to Menu", "back"]])
-        );
-
-        return;
-    }
-
-
-    /*
-     * Cancelled order
-     */
-    if (($payment['status'] ?? '') === 'cancelled') {
-
-        editMsg(
-            $chat_id,
-            $message_id,
-            "❌ <b>This payment order was cancelled.</b>\n\n" .
-            "Please create a new payment request.",
-            btn([["➕ New Payment", "backkey"]])
-        );
-
-        return;
-    }
-
-
-    /*
-     * Already expired
-     */
-    if (($payment['status'] ?? '') === 'expired') {
-
-        editMsg(
-            $chat_id,
-            $message_id,
-            "❌ <b>Payment Order Expired!</b>\n\n" .
-            "Please create a new payment request.",
-            btn([["➕ New Payment", "backkey"]])
-        );
-
-        return;
-    }
-
-
-    /*
-     * Expiry check
-     */
-    $expires_at = (int)($payment['expires_at'] ?? 0);
-
-    if (
-        $expires_at > 0 &&
-        time() > $expires_at
-    ) {
-
-        $payments[$order_id]['status'] = 'expired';
-
-        saveJsonFile(
-            "payments.json",
-            $payments
-        );
-
-        editMsg(
-            $chat_id,
-            $message_id,
-            "❌ <b>Payment Order Expired!</b>\n\n" .
-            "5 minutes have passed. Please create a new payment request.",
-            btn([["➕ New Payment", "backkey"]])
-        );
-
-        return;
-    }
-
-
-    /*
-     * Check payment from FamGateway
-     *
      * IMPORTANT:
-     * verify.php must match your real FamGateway API.
+     * Ye tumhare existing API endpoint ke hisaab se hai.
      */
-    $result = famgatewayRequest(
-        'verify.php',
-        [
-            'order_id' => $order_id
-        ],
-        $api_key
-    );
+    $url = "https://fampaygateway.site/api/create_order.php?" .
+           http_build_query([
+               "amount" => $amount,
+               "api_key" => $api_key
+           ]);
 
 
-    /*
-     * API request error
-     */
-    if (
-        !is_array($result) ||
-        isset($result['error'])
-    ) {
+    $context = stream_context_create([
+        "http" => [
+            "timeout" => 30
+        ]
+    ]);
 
-        $error = is_array($result)
-            ? ($result['error'] ?? 'Unknown API error')
-            : 'Invalid API response';
 
-        error_log(
-            "[FamGateway] Verification error for {$order_id}: " .
-            $error
-        );
+    $raw = @file_get_contents($url, false, $context);
+
+    if($raw === false){
 
         editMsg(
             $chat_id,
             $message_id,
-            "❌ Verification failed. Please try again later.",
-            btn([["🔄 Retry", "check_$order_id"]
-                ],
-                [
-                    ["⬅️ Back", "backkey"]])
+            "❌ Payment gateway se connection nahi ho paya. Dubara try karo.",
+            btn([
+                ["⬅️ Back","backkey"]
+            ])
+        );
+
+        return;
+    }
+
+
+    $res = json_decode($raw, true);
+
+
+    if(
+        !is_array($res) ||
+        ($res["status"] ?? "") !== "success"
+    ){
+
+        $error = $res["message"] ?? "Unknown gateway error";
+
+        editMsg(
+            $chat_id,
+            $message_id,
+            "❌ Order create nahi hua.\n\n<b>Error:</b> " .
+            htmlspecialchars($error),
+            btn([
+                ["🔄 Try Again","pay_".(int)$amount],
+                ["⬅️ Back","backkey"]
+            ])
+        );
+
+        return;
+    }
+
+
+    $data = $res["data"] ?? [];
+
+
+    $order_id = $data["order_id"] ?? "";
+
+    if(empty($order_id)){
+
+        editMsg(
+            $chat_id,
+            $message_id,
+            "❌ Gateway ne Order ID return nahi ki.",
+            btn([
+                ["⬅️ Back","backkey"]
+            ])
+        );
+
+        return;
+    }
+
+
+    $qr_url = $data["qr_url"] ?? "";
+    $upi_id = $data["upi_id"] ?? "";
+
+
+    /*
+     * Payment order save
+     */
+    $orders = loadJsonSafe("orders.json", []);
+
+    $expire_time = time() + (5 * 60);
+
+    $orders[$order_id] = [
+        "user" => $user_id,
+        "chat_id" => $chat_id,
+        "amount" => $amount,
+        "status" => "pending",
+        "credited" => false,
+        "created" => time(),
+        "expire" => $expire_time
+    ];
+
+    saveJsonSafe("orders.json", $orders);
+
+
+    $expire_display = date("H:i:s", $expire_time);
+
+
+    $msg =
+        "💸 <b>Payment Request</b>\n\n" .
+        "💰 Amount: ₹" . number_format($amount, 2) . "\n" .
+        "🆔 Order ID: <code>" . htmlspecialchars($order_id) . "</code>\n";
+
+
+    if(!empty($upi_id)){
+        $msg .= "📱 UPI ID: <code>" .
+                htmlspecialchars($upi_id) .
+                "</code>\n";
+    }
+
+
+    $msg .=
+        "⏰ Expire: " . $expire_display . "\n\n" .
+        "QR scan karke payment karo.";
+
+
+    /*
+     * FLAT BUTTON FORMAT
+     * Tumhare btn() function ke hisaab se
+     */
+    $buttons = [
+        ["🔄 Check Payment","check_$order_id"],
+        ["❌ Cancel Order","cancel_$order_id"],
+        ["⬅️ Back","backkey"]
+    ];
+
+
+    /*
+     * QR available hai to photo bhejo
+     */
+    if(!empty($qr_url)){
+
+        sendPhoto(
+            $chat_id,
+            $qr_url,
+            $msg,
+            btn($buttons)
+        );
+
+    } else {
+
+        sendMessage(
+            $chat_id,
+            $msg . "\n\n⚠️ QR URL gateway ne return nahi ki.",
+            btn($buttons)
+        );
+    }
+
+
+    if($message_id > 0){
+        deleteMsg($chat_id, $message_id);
+    }
+}
+
+
+/*
+ * CHECK PAYMENT
+ */
+function checkPayment($chat_id, $message_id, $order_id){
+
+    $api_key = getFamApiKey();
+
+    if(empty($api_key)) return;
+
+
+    $orders = loadJsonSafe("orders.json", []);
+
+
+    if(!isset($orders[$order_id])){
+
+        editMsg(
+            $chat_id,
+            $message_id,
+            "❌ Order nahi mila.",
+            btn([
+                ["⬅️ Back","backkey"]
+            ])
+        );
+
+        return;
+    }
+
+
+    $order = $orders[$order_id];
+
+
+    /*
+     * Security: order correct user ka hona chahiye
+     */
+    if(
+        isset($order["chat_id"]) &&
+        (string)$order["chat_id"] !== (string)$chat_id
+    ){
+
+        editMsg(
+            $chat_id,
+            $message_id,
+            "❌ Ye payment order aapka nahi hai.",
+            btn([
+                ["⬅️ Back","backkey"]
+            ])
+        );
+
+        return;
+    }
+
+
+    if(!empty($order["credited"])){
+
+        $balances = loadJsonSafe("balances.json", []);
+
+        $balance = (float)($balances[$order["user"]] ?? 0);
+
+        editMsg(
+            $chat_id,
+            $message_id,
+            "✅ Payment already processed!\n\n" .
+            "💼 Balance: ₹" . number_format($balance, 2),
+            btn([
+                ["⬅️ Menu","back"]
+            ])
+        );
+
+        return;
+    }
+
+
+    if(($order["status"] ?? "") === "cancelled"){
+
+        editMsg(
+            $chat_id,
+            $message_id,
+            "❌ Ye payment order cancel ho chuka hai.",
+            btn([
+                ["➕ New Payment","backkey"]
+            ])
+        );
+
+        return;
+    }
+
+
+    if(time() > ($order["expire"] ?? 0)){
+
+        $orders[$order_id]["status"] = "expired";
+
+        saveJsonSafe("orders.json", $orders);
+
+        editMsg(
+            $chat_id,
+            $message_id,
+            "❌ <b>Order Expired!</b>\n\nNaya payment request banao.",
+            btn([
+                ["➕ New Payment","backkey"]
+            ])
         );
 
         return;
@@ -1323,460 +1395,228 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
 
 
     /*
-     * Get response data safely
+     * PAYMENT STATUS API
      */
-    $status = strtolower(
-        (string)($result['status'] ?? '')
-    );
-
-    $data = isset($result['data']) &&
-            is_array($result['data'])
-        ? $result['data']
-        : [];
+    $url = "https://fampaygateway.site/api/verify.php?" .
+           http_build_query([
+               "order_id" => $order_id,
+               "api_key" => $api_key
+           ]);
 
 
-    /*
-     * PAYMENT SUCCESS
-     *
-     * Supports common success values.
-     */
-    $is_paid = in_array(
-        $status,
-        [
-            'success',
-            'paid',
-            'completed'
-        ],
-        true
-    );
+    $raw = @file_get_contents($url);
 
 
-    if ($is_paid) {
-
-        /*
-         * IMPORTANT:
-         * Use original payment amount for credit
-         * unless API amount is valid and matches.
-         */
-        $stored_amount = (float)(
-            $payment['amount'] ?? 0
-        );
-
-        $api_amount = isset($data['amount'])
-            ? (float)$data['amount']
-            : $stored_amount;
-
-
-        /*
-         * Prevent amount mismatch abuse
-         */
-        if (
-            $stored_amount <= 0 ||
-            (
-                $api_amount > 0 &&
-                abs($api_amount - $stored_amount) > 0.01
-            )
-        ) {
-
-            error_log(
-                "[FamGateway] Amount mismatch for {$order_id}. " .
-                "Stored={$stored_amount}, API={$api_amount}"
-            );
-
-            editMsg(
-                $chat_id,
-                $message_id,
-                "❌ Payment amount verification failed. Please contact admin.",
-                btn([["⬅️ Back", "backkey"]])
-            );
-
-            return;
-        }
-
-
-        $amount = $stored_amount;
-
-
-        /*
-         * UTR
-         */
-        $utr = trim(
-            (string)(
-                $data['utr'] ??
-                $data['transaction_id'] ??
-                ''
-            )
-        );
-
-
-        /*
-         * Reload payments before update
-         */
-        $payments = loadJsonFile(
-            "payments.json",
-            []
-        );
-
-
-        /*
-         * Check order again
-         */
-        if (!isset($payments[$order_id])) {
-
-            editMsg(
-                $chat_id,
-                $message_id,
-                "❌ Payment order not found.",
-                btn([["⬅️ Back", "backkey"]])
-            );
-
-            return;
-        }
-
-
-        /*
-         * If already credited while checking
-         */
-        if (!empty($payments[$order_id]['credited'])) {
-
-            $balances = loadJsonFile(
-                "balances.json",
-                []
-            );
-
-            $balance = (float)(
-                $balances[$user_id] ?? 0
-            );
-
-            editMsg(
-                $chat_id,
-                $message_id,
-                "✅ <b>Payment Already Processed!</b>\n\n" .
-                "💼 Current Balance: ₹" .
-                number_format($balance, 2),
-                btn([["⬅️ Back to Menu", "back"]])
-            );
-
-            return;
-        }
-
-
-        /*
-         * Save payment status
-         */
-        $payments[$order_id]['status'] = 'paid';
-        $payments[$order_id]['utr'] = $utr;
-        $payments[$order_id]['payment_time'] =
-            $data['payment_time'] ??
-            date('Y-m-d H:i:s');
-
-
-        saveJsonFile(
-            "payments.json",
-            $payments
-        );
-
-
-        /*
-         * Atomic credit
-         *
-         * This function MUST mark the order
-         * as credited safely.
-         */
-        $credit_result = creditUserBalanceAtomic(
-            $user_id,
-            $amount,
-            $order_id
-        );
-
-
-        if (
-            !is_array($credit_result) ||
-            empty($credit_result['success'])
-        ) {
-
-            error_log(
-                "[FamGateway] Credit failed for {$order_id}: " .
-                (
-                    $credit_result['error'] ??
-                    'Unknown error'
-                )
-            );
-
-            editMsg(
-                $chat_id,
-                $message_id,
-                "❌ Payment was detected but balance credit failed.\n\n" .
-                "Please contact admin with Order ID:\n" .
-                "<code>" .
-                htmlspecialchars($order_id) .
-                "</code>",
-                btn([["⬅️ Back", "backkey"]])
-            );
-
-            return;
-        }
-
-
-        /*
-         * Mark credited
-         */
-        $payments = loadJsonFile(
-            "payments.json",
-            []
-        );
-
-
-        if (isset($payments[$order_id])) {
-
-            $payments[$order_id]['credited'] = true;
-
-            $payments[$order_id]['credited_at'] =
-                time();
-
-            $payments[$order_id]['status'] =
-                'paid';
-
-            saveJsonFile(
-                "payments.json",
-                $payments
-            );
-        }
-
-
-        /*
-         * Already credited response
-         */
-        if (!empty($credit_result['already_credited'])) {
-
-            $balance = (float)(
-                $credit_result['balance'] ?? 0
-            );
-
-            editMsg(
-                $chat_id,
-                $message_id,
-                "✅ <b>Payment Already Processed!</b>\n\n" .
-                "💼 Current Balance: ₹" .
-                number_format($balance, 2),
-                btn([["⬅️ Back to Menu", "back"]])
-            );
-
-            return;
-        }
-
-
-        /*
-         * SUCCESS MESSAGE
-         */
-        $new_balance = (float)(
-            $credit_result['balance'] ?? 0
-        );
-
-
-        $msg =
-            "✅ <b>Payment Successful!</b>\n\n" .
-            "💰 Amount Credited: ₹" .
-            number_format($amount, 2) .
-            "\n" .
-            "🆔 Order ID: <code>" .
-            htmlspecialchars($order_id) .
-            "</code>\n";
-
-
-        if (!empty($utr)) {
-
-            $msg .=
-                "💳 UTR: <code>" .
-                htmlspecialchars($utr) .
-                "</code>\n";
-        }
-
-
-        $msg .=
-            "💼 New Balance: ₹" .
-            number_format($new_balance, 2) .
-            "\n\n" .
-            "Your account has been credited successfully!";
-
+    if($raw === false){
 
         editMsg(
             $chat_id,
             $message_id,
-            $msg,
-            btn([["⬅️ Back to Menu", "back"]])
+            "❌ Payment check nahi ho paya. Dobara try karo.",
+            btn([
+                ["🔄 Retry","check_$order_id"],
+                ["⬅️ Back","backkey"]
+            ])
         );
 
         return;
+    }
+
+
+    $res = json_decode($raw, true);
+
+
+    /*
+     * SUCCESS
+     */
+    if(
+        is_array($res) &&
+        ($res["status"] ?? "") === "success" &&
+        !empty($res["data"])
+    ){
+
+        $data = $res["data"];
+
+
+        /*
+         * API se paid confirmation honi chahiye
+         */
+        if(
+            isset($data["utr"]) ||
+            (($data["payment_status"] ?? "") === "paid")
+        ){
+
+            /*
+             * Reload before credit
+             */
+            $orders = loadJsonSafe("orders.json", []);
+
+
+            if(
+                !isset($orders[$order_id]) ||
+                !empty($orders[$order_id]["credited"])
+            ){
+
+                editMsg(
+                    $chat_id,
+                    $message_id,
+                    "✅ Payment already processed.",
+                    btn([
+                        ["⬅️ Menu","back"]
+                    ])
+                );
+
+                return;
+            }
+
+
+            $user_id = $orders[$order_id]["user"];
+
+            /*
+             * Always credit original amount
+             */
+            $amount = (float)$orders[$order_id]["amount"];
+
+
+            $balances = loadJsonSafe("balances.json", []);
+
+
+            if(!isset($balances[$user_id])){
+                $balances[$user_id] = 0;
+            }
+
+
+            $balances[$user_id] =
+                (float)$balances[$user_id] + $amount;
+
+
+            /*
+             * Mark credited BEFORE final save
+             */
+            $orders[$order_id]["status"] = "paid";
+            $orders[$order_id]["credited"] = true;
+            $orders[$order_id]["paid_at"] = time();
+            $orders[$order_id]["utr"] = $data["utr"] ?? "";
+
+
+            saveJsonSafe("balances.json", $balances);
+            saveJsonSafe("orders.json", $orders);
+
+
+            $utr = htmlspecialchars(
+                $data["utr"] ?? "N/A"
+            );
+
+
+            $new_balance = (float)$balances[$user_id];
+
+
+            $msg =
+                "✅ <b>Payment Successful!</b>\n\n" .
+                "💰 ₹" . number_format($amount, 2) .
+                " Balance me add ho gaya\n" .
+                "💳 UTR: <code>$utr</code>\n" .
+                "💼 New Balance: ₹" .
+                number_format($new_balance, 2);
+
+
+            editMsg(
+                $chat_id,
+                $message_id,
+                $msg,
+                btn([
+                    ["⬅️ Menu","back"]
+                ])
+            );
+
+            return;
+        }
     }
 
 
     /*
      * PAYMENT PENDING
      */
-    $remaining = max(
-        0,
-        $expires_at - time()
-    );
+    $remaining =
+        max(0, ($order["expire"] ?? time()) - time());
 
     $min = floor($remaining / 60);
     $sec = $remaining % 60;
 
 
-    $msg =
-        "⏳ <b>Payment Pending</b>\n\n" .
-        "🆔 Order ID: <code>" .
-        htmlspecialchars($order_id) .
-        "</code>\n" .
-        "💰 Amount: ₹" .
-        number_format(
-            (float)($payment['amount'] ?? 0),
-            2
-        ) .
-        "\n" .
-        "⏱️ Remaining: {$min}m {$sec}s\n\n" .
-        "Complete the payment and click Check Payment again.";
-
-
-    $buttons = [
-        ["🔄 Check Payment", "check_$order_id"],
-        [
-            ["❌ Cancel Order", "cancel_$order_id"]
-        ],
-        [
-            ["⬅️ Back", "backkey"]
-        ]
-    ];
-
-
     editMsg(
         $chat_id,
         $message_id,
-        $msg,
-        btn($buttons)
+        "⏳ <b>Payment Pending</b>\n\n" .
+        "🆔 Order: <code>" .
+        htmlspecialchars($order_id) .
+        "</code>\n" .
+        "💰 Amount: ₹" .
+        number_format((float)$order["amount"], 2) .
+        "\n" .
+        "⏱️ Remaining: {$min}m {$sec}s\n\n" .
+        "Payment ke baad Check Payment dabao.",
+        btn([
+            ["🔄 Check Payment","check_$order_id"],
+            ["❌ Cancel Order","cancel_$order_id"],
+            ["⬅️ Back","backkey"]
+        ])
     );
 }
 
 
-/**
- * Cancel a payment order
+/*
+ * CANCEL PAYMENT
  */
-function cancelOrder(
-    $chat_id,
-    $message_id,
-    $order_id,
-    $user_id
-) {
+function cancelOrder($chat_id, $message_id, $order_id){
 
-    $payments = loadJsonFile(
-        "payments.json",
-        []
-    );
+    $orders = loadJsonSafe("orders.json", []);
 
 
-    if (!isset($payments[$order_id])) {
-
-        editMsg(
-            $chat_id,
-            $message_id,
-            "❌ Payment order not found.",
-            btn([["➕ New Payment", "backkey"]])
-        );
-
-        return;
-    }
-
-
-    $payment = $payments[$order_id];
+    if(!isset($orders[$order_id])) return;
 
 
     /*
-     * Verify user
+     * Security
      */
-    if (
-        !isset($payment['user_id']) ||
-        (string)$payment['user_id'] !==
-        (string)$user_id
-    ) {
+    if(
+        isset($orders[$order_id]["chat_id"]) &&
+        (string)$orders[$order_id]["chat_id"] !==
+        (string)$chat_id
+    ){
+        return;
+    }
+
+
+    if(!empty($orders[$order_id]["credited"])){
 
         editMsg(
             $chat_id,
             $message_id,
-            "❌ This payment order does not belong to you.",
-            btn([["⬅️ Back", "backkey"]])
+            "✅ Payment already processed, cancel nahi ho sakta.",
+            btn([
+                ["⬅️ Menu","back"]
+            ])
         );
 
         return;
     }
 
 
-    /*
-     * Already credited
-     */
-    if (!empty($payment['credited'])) {
-
-        editMsg(
-            $chat_id,
-            $message_id,
-            "✅ This payment is already processed and cannot be cancelled.",
-            btn([["⬅️ Back to Menu", "back"]])
-        );
-
-        return;
-    }
+    $orders[$order_id]["status"] = "cancelled";
+    $orders[$order_id]["cancelled_at"] = time();
 
 
-    /*
-     * Already cancelled
-     */
-    if (($payment['status'] ?? '') === 'cancelled') {
-
-        editMsg(
-            $chat_id,
-            $message_id,
-            "❌ This payment order is already cancelled.",
-            btn([["➕ New Payment", "backkey"]])
-        );
-
-        return;
-    }
-
-
-    /*
-     * Mark cancelled
-     */
-    $payments[$order_id]['status'] =
-        'cancelled';
-
-    $payments[$order_id]['cancelled_at'] =
-        time();
-
-
-    if (!saveJsonFile(
-        "payments.json",
-        $payments
-    )) {
-
-        editMsg(
-            $chat_id,
-            $message_id,
-            "❌ Failed to cancel payment. Please try again.",
-            btn([["⬅️ Back", "backkey"]])
-        );
-
-        return;
-    }
+    saveJsonSafe("orders.json", $orders);
 
 
     editMsg(
         $chat_id,
         $message_id,
-        "❌ <b>Payment Cancelled</b>\n\n" .
-        "🆔 Order ID: <code>" .
-        htmlspecialchars($order_id) .
-        "</code>\n\n" .
-        "You can create a new payment request.",
-        btn([["➕ New Payment", "backkey"]])
+        "❌ <b>Order Cancelled</b>\n\nNaya payment kar sakte ho.",
+        btn([
+            ["➕ New Payment","backkey"]
+        ])
     );
 }
 
