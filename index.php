@@ -1080,6 +1080,9 @@ function famgatewayRequest($endpoint, $params, $api_key) {
     
     $url = $base_url . $endpoint . "?" . http_build_query($params);
     
+    // Log the request for debugging
+    error_log("[FamGateway] Request URL: " . $url);
+    
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL => $url,
@@ -1096,6 +1099,10 @@ function famgatewayRequest($endpoint, $params, $api_key) {
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curl_error = curl_error($ch);
     curl_close($ch);
+    
+    // Log the response for debugging
+    error_log("[FamGateway] HTTP Code: " . $http_code);
+    error_log("[FamGateway] Response: " . substr($response, 0, 500));
     
     if ($curl_error) {
         error_log("[FamGateway] cURL Error: " . $curl_error);
@@ -1125,6 +1132,10 @@ function createFamPayOrder($chat_id, $message_id, $user_id, $amount) {
     $settings = json_decode(file_get_contents("settings.json"), true);
     $api_key = isset($settings['api_key']) ? trim($settings['api_key']) : '';
     
+    // Debug: Log the API key (first few chars only)
+    error_log("[FamGateway] API Key from settings: " . substr($api_key, 0, 20) . "...");
+    error_log("[FamGateway] API Key from env: " . substr(getenv("FAMGATEWAY_API_KEY") ?: 'NOT SET', 0, 20) . "...");
+    
     // Validate amount
     $amount = (float)$amount;
     if ($amount < 1 || $amount > 5000) {
@@ -1145,7 +1156,7 @@ function createFamPayOrder($chat_id, $message_id, $user_id, $amount) {
         } else {
             sendMessage($chat_id, $error_msg, btn([["⬅️ Back", "backkey"]]));
         }
-        error_log("[FamGateway] API key not set");
+        error_log("[FamGateway] API key is empty or default");
         return;
     }
     
