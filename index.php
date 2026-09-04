@@ -2,9 +2,9 @@
 ob_start();
 
 // ========== CONFIG ==========
-$botToken = getenv("BOT_TOKEN") ?: "BOT_TOKEN";
+$botToken = getenv("BOT_TOKEN") ?: "8764046947:AAHMS_PJpA8NCDWZ_unABge_TwYA6RnCsok";
 $website = "https://api.telegram.org/bot".$botToken;
-$adminID = getenv("ADMIN_ID") ?: "ADMN ID TOKEN";
+$adminID = getenv("ADMIN_ID") ?: "5997885135";
 
 // ========== FILES ==========
 foreach(["balances.json","orders.json","temp.json","users.json","settings.json","products.json","payments.json"] as $f) {
@@ -13,10 +13,10 @@ foreach(["balances.json","orders.json","temp.json","users.json","settings.json",
 
 // ========== DEFAULT SETTINGS ==========
 $settings = json_decode(file_get_contents("settings.json"), true);
-if(!isset($settings['proof_link'])) $settings['proof_link'] = "https://t.me/BMWytx";
-if(!isset($settings['howto_link'])) $settings['howto_link'] = "https://t.me/BMWytx/145";
+if(!isset($settings['proof_link'])) $settings['proof_link'] = "https://t.me/BMWytxv1";
+if(!isset($settings['howto_link'])) $settings['howto_link'] = "https://t.me/BMWytxv1/145";
 if(!isset($settings['support_user'])) $settings['support_user'] = "@BMWytx9";
-if(!isset($settings['api_key'])) $settings['api_key'] = getenv("FAMGATEWAY_API_KEY") ?: "FAM KEY DALO YAHA";
+if(!isset($settings['api_key'])) $settings['api_key'] = getenv("FAMGATEWAY_API_KEY") ?: "fam_6ce10996ccd42211d2a9a8e9aa0a4caed8b8f5ee";
 file_put_contents("settings.json", json_encode($settings));
 
 // ========== GET UPDATE ==========
@@ -1146,11 +1146,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
             $chat_id,
             $message_id,
             "❌ Payment system not configured. Please contact admin.",
-            btn([
-                [
-                    ["⬅️ Back", "backkey"]
-                ]
-            ])
+            btn([["⬅️ Back", "backkey"]])
         );
 
         return;
@@ -1166,11 +1162,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
             $chat_id,
             $message_id,
             "❌ Payment order not found.",
-            btn([
-                [
-                    ["⬅️ Back", "backkey"]
-                ]
-            ])
+            btn([["⬅️ Back", "backkey"]])
         );
 
         return;
@@ -1190,11 +1182,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
             $chat_id,
             $message_id,
             "❌ This payment order does not belong to you.",
-            btn([
-                [
-                    ["⬅️ Back", "backkey"]
-                ]
-            ])
+            btn([["⬅️ Back", "backkey"]])
         );
 
         return;
@@ -1218,11 +1206,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
             "✅ <b>Payment Already Processed!</b>\n\n" .
             "💼 Current Balance: ₹" .
             number_format($balance, 2),
-            btn([
-                [
-                    ["⬅️ Back to Menu", "back"]
-                ]
-            ])
+            btn([["⬅️ Back to Menu", "back"]])
         );
 
         return;
@@ -1239,11 +1223,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
             $message_id,
             "❌ <b>This payment order was cancelled.</b>\n\n" .
             "Please create a new payment request.",
-            btn([
-                [
-                    ["➕ New Payment", "backkey"]
-                ]
-            ])
+            btn([["➕ New Payment", "backkey"]])
         );
 
         return;
@@ -1260,11 +1240,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
             $message_id,
             "❌ <b>Payment Order Expired!</b>\n\n" .
             "Please create a new payment request.",
-            btn([
-                [
-                    ["➕ New Payment", "backkey"]
-                ]
-            ])
+            btn([["➕ New Payment", "backkey"]])
         );
 
         return;
@@ -1293,11 +1269,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
             $message_id,
             "❌ <b>Payment Order Expired!</b>\n\n" .
             "5 minutes have passed. Please create a new payment request.",
-            btn([
-                [
-                    ["➕ New Payment", "backkey"]
-                ]
-            ])
+            btn([["➕ New Payment", "backkey"]])
         );
 
         return;
@@ -1340,14 +1312,10 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
             $chat_id,
             $message_id,
             "❌ Verification failed. Please try again later.",
-            btn([
-                [
-                    ["🔄 Retry", "check_$order_id"]
+            btn([["🔄 Retry", "check_$order_id"]
                 ],
                 [
-                    ["⬅️ Back", "backkey"]
-                ]
-            ])
+                    ["⬅️ Back", "backkey"]])
         );
 
         return;
@@ -1419,11 +1387,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
                 $chat_id,
                 $message_id,
                 "❌ Payment amount verification failed. Please contact admin.",
-                btn([
-                    [
-                        ["⬅️ Back", "backkey"]
-                    ]
-                ])
+                btn([["⬅️ Back", "backkey"]])
             );
 
             return;
@@ -1463,11 +1427,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
                 $chat_id,
                 $message_id,
                 "❌ Payment order not found.",
-                btn([
-                    [
-                        ["⬅️ Back", "backkey"]
-                    ]
-                ])
+                btn([["⬅️ Back", "backkey"]])
             );
 
             return;
@@ -1494,11 +1454,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
                 "✅ <b>Payment Already Processed!</b>\n\n" .
                 "💼 Current Balance: ₹" .
                 number_format($balance, 2),
-                btn([
-                    [
-                        ["⬅️ Back to Menu", "back"]
-                    ]
-                ])
+                btn([["⬅️ Back to Menu", "back"]])
             );
 
             return;
@@ -1555,11 +1511,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
                 "<code>" .
                 htmlspecialchars($order_id) .
                 "</code>",
-                btn([
-                    [
-                        ["⬅️ Back", "backkey"]
-                    ]
-                ])
+                btn([["⬅️ Back", "backkey"]])
             );
 
             return;
@@ -1607,11 +1559,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
                 "✅ <b>Payment Already Processed!</b>\n\n" .
                 "💼 Current Balance: ₹" .
                 number_format($balance, 2),
-                btn([
-                    [
-                        ["⬅️ Back to Menu", "back"]
-                    ]
-                ])
+                btn([["⬅️ Back to Menu", "back"]])
             );
 
             return;
@@ -1656,11 +1604,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
             $chat_id,
             $message_id,
             $msg,
-            btn([
-                [
-                    ["⬅️ Back to Menu", "back"]
-                ]
-            ])
+            btn([["⬅️ Back to Menu", "back"]])
         );
 
         return;
@@ -1695,9 +1639,7 @@ function checkPayment($chat_id, $message_id, $order_id, $user_id) {
 
 
     $buttons = [
-        [
-            ["🔄 Check Payment", "check_$order_id"]
-        ],
+        ["🔄 Check Payment", "check_$order_id"],
         [
             ["❌ Cancel Order", "cancel_$order_id"]
         ],
@@ -1738,11 +1680,7 @@ function cancelOrder(
             $chat_id,
             $message_id,
             "❌ Payment order not found.",
-            btn([
-                [
-                    ["➕ New Payment", "backkey"]
-                ]
-            ])
+            btn([["➕ New Payment", "backkey"]])
         );
 
         return;
@@ -1765,11 +1703,7 @@ function cancelOrder(
             $chat_id,
             $message_id,
             "❌ This payment order does not belong to you.",
-            btn([
-                [
-                    ["⬅️ Back", "backkey"]
-                ]
-            ])
+            btn([["⬅️ Back", "backkey"]])
         );
 
         return;
@@ -1785,11 +1719,7 @@ function cancelOrder(
             $chat_id,
             $message_id,
             "✅ This payment is already processed and cannot be cancelled.",
-            btn([
-                [
-                    ["⬅️ Back to Menu", "back"]
-                ]
-            ])
+            btn([["⬅️ Back to Menu", "back"]])
         );
 
         return;
@@ -1805,11 +1735,7 @@ function cancelOrder(
             $chat_id,
             $message_id,
             "❌ This payment order is already cancelled.",
-            btn([
-                [
-                    ["➕ New Payment", "backkey"]
-                ]
-            ])
+            btn([["➕ New Payment", "backkey"]])
         );
 
         return;
@@ -1835,11 +1761,7 @@ function cancelOrder(
             $chat_id,
             $message_id,
             "❌ Failed to cancel payment. Please try again.",
-            btn([
-                [
-                    ["⬅️ Back", "backkey"]
-                ]
-            ])
+            btn([["⬅️ Back", "backkey"]])
         );
 
         return;
@@ -1854,11 +1776,7 @@ function cancelOrder(
         htmlspecialchars($order_id) .
         "</code>\n\n" .
         "You can create a new payment request.",
-        btn([
-            [
-                ["➕ New Payment", "backkey"]
-            ]
-        ])
+        btn([["➕ New Payment", "backkey"]])
     );
 }
 
