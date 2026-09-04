@@ -2,9 +2,9 @@
 ob_start();
 
 // ========== CONFIG ==========
-$botToken = getenv("BOT_TOKEN") ?: "5997885135";
+$botToken = getenv("BOT_TOKEN") ?: "8764046947:AAHMS_PJpA8NCDWZ_unABge_TwYA6RnCsok";
 $website = "https://api.telegram.org/bot".$botToken;
-$adminID = getenv("ADMIN_ID") ?: "8764046947:AAHMS_PJpA8NCDWZ_unABge_TwYA6RnCsok";
+$adminID = getenv("ADMIN_ID") ?: "5997885135";
 
 // ========== FILES ==========
 foreach(["balances.json","orders.json","temp.json","users.json","settings.json","products.json","payments.json"] as $f) {
